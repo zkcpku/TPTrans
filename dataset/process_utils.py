@@ -40,7 +40,6 @@ def decoder_process(target, vocab, max_target_len, e_voc=None, pointer=False):
     f_target = f_t + [vocab.eos_index]
     f_target = f_target[:max_target_len] + [vocab.pad_index] * abs(max_target_len - len(f_target))
     # f_target: max_target_len
-
     return f_source, f_target
 
 

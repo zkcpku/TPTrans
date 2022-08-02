@@ -1,1 +1,6 @@
-
+data/
+*.log
+*.pyc
+run/
+*.pth
+.ipynb_checkpoints/

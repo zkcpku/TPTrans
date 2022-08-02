@@ -7,12 +7,12 @@ from token_utils import split_func_name
 
 def init_parser(language):
     Language.build_library(
-        '../build/{}.so'.format(language),
+        '/home/zhangkechi/workspace/data/treesitter/build/{}.so'.format(language),
         [
-            '../vendor/tree-sitter-{}'.format(language),
+            '/home/zhangkechi/workspace/data/treesitter/tree-sitter-{}'.format(language),
         ]
     )
-    language = Language('../build/{}.so'.format(language), language)
+    language = Language('/home/zhangkechi/workspace/data/treesitter/build/{}.so'.format(language), language)
     lang_parser = Parser()
     lang_parser.set_language(language)
     return lang_parser

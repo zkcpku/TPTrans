@@ -3,7 +3,7 @@ import argparse
 from torch.utils.data import DataLoader
 from dataset import PathAttenDataset, TextVocab, UniTextVocab, collect_fn, CTTextVocab
 from trainer import Trainer
-from model import Model
+from model import ModelClf as Model
 import torch
 import numpy as np
 import random
@@ -29,9 +29,8 @@ def train():
     # dataset
     parser.add_argument("--dataset", type=str, help="train dataset", default='python',
                         choices=['python', 'ruby', 'javascript', 'go'])
-    parser.add_argument("--max_code_length", type=int, default=512, help="")
     parser.add_argument("--on_memory", type=boolean_string, default=True, help="Loading datasets into memory")
-
+    parser.add_argument("--clf_num", type=int, default=800, help="")
     # dataset size
     parser.add_argument("--max_code_length", type=int, default=512, help="")
     parser.add_argument("--max_path_length", type=int, default=32, help="")
@@ -56,7 +55,7 @@ def train():
     parser.add_argument("--lr_scheduler", type=boolean_string, default=True,
                         help="We use the ReduceLROnPlateau scheduler")
     parser.add_argument("--clip", type=float, default=0, help="0 is no clip")
-    parser.add_argument("--batch_size", type=int, default=64, help="number of batch_size")
+    parser.add_argument("--batch_size", type=int, default=32, help="number of batch_size")
     parser.add_argument("--accu_batch_size", type=int, default=128,
                         help="number of real batch_size per step, save gpu memory")
     parser.add_argument("--val_batch_size", type=int, default=64, help="number of batch_size of valid")

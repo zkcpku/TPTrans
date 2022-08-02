@@ -127,10 +127,11 @@ class Trainer:
             data = {key: value.to(self.device) if torch.is_tensor(value) else value for key, value in data.items()}
             if train:
                 self.model.train()
+                # import pdb;pdb.set_trace()
                 out = self.model(data)
-                loss = self.label_smoothing_loss(out.view(out.shape[0] * out.shape[1], -1),
-                                                 data['f_target'].view(-1),
-                                                 eps=self.args.label_smoothing)  # avg at every step
+                labels = data['target']
+                loss_fct = torch.nn.CrossEntropyLoss()
+                loss = loss_fct(out, labels)
                 accu_loss = loss / self.accu_steps
                 accu_loss.backward()
                 if self.clip > 0:
@@ -142,8 +143,11 @@ class Trainer:
                 self.model.eval()
                 with torch.no_grad():
                     out = self.model(data)
-                    loss = self.criterion(out.view(out.shape[0] * out.shape[1], -1),
-                                          data['f_target'].view(-1))  # avg at every step
+                    labels = data['target']
+                    loss_fct = torch.nn.CrossEntropyLoss()
+                    loss = loss_fct(out, labels)
+                    # loss = self.criterion(out.view(out.shape[0] * out.shape[1], -1),
+                    #                       data['f_target'].view(-1))  # avg at every step
             avg_loss += loss.item()
             post_fix = {
                 'str': str_code,
@@ -201,8 +205,8 @@ class Trainer:
 
         def write_strings(predict, original, ref_file_, pred_file_):
             for p, o in zip(predict, original):
-                ref_file_.write(' '.join(o) + '\n')
-                pred_file_.write(' '.join(p) + '\n')
+                ref_file_.write(' '.join(str(o)) + '\n')
+                pred_file_.write(' '.join(str(p)) + '\n')
 
         data_iter = tqdm(enumerate(data_loader),
                          desc="EP_%s:%d" % (str_code + '_infer', epoch),
@@ -213,6 +217,7 @@ class Trainer:
                                            'pred_{}_{}.txt'.format(str_code, epoch))
         with open(ref_file_name, 'w') as ref_file, open(predicted_file_name, 'w') as pred_file:
             predict_strings = []
+            ref_strings = []
             predict_idx = []
             ref_idx = []
             for i, data in data_iter:
@@ -224,40 +229,17 @@ class Trainer:
                         content_e, voc_len = data['content_e'], data['voc_len']
                     else:
                         content_e, voc_len = None, None
-                    memory, memory_key_padding_mask = self.model.module.encode(
-                        data) if self.wrap else self.model.encode(data)
-                    f_source = torch.ones(memory.shape[0], 1, dtype=torch.long).fill_(
-                        self.t_vocab.sos_index).to(
-                        self.device)  # f_source for feed into model
-                    f_source_ = torch.ones(memory.shape[0], 1, dtype=torch.long).fill_(
-                        self.t_vocab.sos_index).to(self.device)  # f_source_ for get final output idx
-                    for _ in range(self.args.max_target_len):
-                        param = (memory, f_source, memory_key_padding_mask, content_e, voc_len)
-                        out = self.model.module.decode(*param) if self.wrap else self.model.decode(*param)
-                        if self.unk_shift:
-                            out[:, :, self.t_vocab.unk_index] = float('-inf')
-                        idx = torch.argmax(out, dim=-1)[:, -1].view(-1, 1)
-                        idx = idx.masked_fill(idx >= len(self.t_vocab),
-                                              self.t_vocab.unk_index)  # remove extended vocab idx, for embedded
-                        f_source = torch.cat((f_source, idx), dim=-1)
-                        idx_ = torch.argmax(out, dim=-1)[:, -1].view(-1, 1)
-                        f_source_ = torch.cat((f_source_, idx_), dim=-1)
-                    for idx, sample in enumerate(f_source_):
-                        if self.args.pointer:
-                            idx_lis, str_lis = filter_special_convert(sample.tolist(), data['e_voc_'][idx])
-                        else:
-                            idx_lis, str_lis = filter_special_convert(sample.tolist())
-                        predict_strings.append(str_lis)
-                        predict_idx.append(idx_lis)
-                    for sample in data['f_target']:
-                        idx_lis, _ = filter_special_convert(sample.tolist())
-                        ref_idx.append(idx_lis)
-            ref_strings = get_ref_strings(nums=len(predict_strings))
+                    out = self.model(data)
+                    predict_idx = out.argmax(dim=-1).tolist()
+                    label_idx = data['target'].tolist()
+                    for sample in predict_idx:
+                        predict_strings.append(sample)
+                    for sample in label_idx:
+                        ref_strings.append(sample)
+            # ref_strings = get_ref_strings(nums=len(predict_strings))
             write_strings(predict_strings, ref_strings, ref_file, pred_file)
-        if self.args.old_calculate:
-            precision, recall, f1 = old_calculate(predict_idx, ref_idx)
-        else:
-            precision, recall, f1 = calculate(predict_idx, ref_idx)
+        acc = sum([1 for p, r in zip(predict_strings, ref_strings) if p == r]) / len(predict_strings)
+        precision, recall, f1 = acc, acc, acc
         print(
             "{} precision={:.6f}, recall={:.6f}, f1={:.6f}".format(str_code, precision, recall, f1), file=self.writer,
             flush=True)

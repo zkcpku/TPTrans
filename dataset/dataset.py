@@ -47,7 +47,7 @@ class PathAttenDataset(Dataset):
         if self.args.tiny_data > 0:
             self.corpus_line = self.args.tiny_data
         self.hop = self.args.hop
-        self.rp_sample = self.args.rp_sample
+        # self.rp_sample = self.args.rp_sample
 
     def __len__(self):
         return self.corpus_line
@@ -60,7 +60,6 @@ class PathAttenDataset(Dataset):
                 in sample.items()}
 
     def process(self, data):
-
         if self.args.pointer:
             assert self.args.uni_vocab, 'separate vocab not support'
             e_voc, e_voc_, voc_len = make_extended_vocabulary(data['content'], self.s_vocab)
@@ -79,9 +78,13 @@ class PathAttenDataset(Dataset):
                                                               self.args.max_r_path_num,
                                                               self.args.max_code_length, self.args.max_r_path_length,
                                                               self.args.path_embedding_num, convert_hop=self.hop)
+        cls_num = data['target']
+        cls_num = ''.join(cls_num)
+        cls_num = int(cls_num)
         data_dic = {'f_source': f_source, 'f_target': f_target, 'content': content_, 'content_mask': content_mask_,
                     'path_map': paths_map_, 'paths': paths_, 'paths_mask': paths_mask_, 'named': named_, 'row': row_,
-                    'r_paths': r_paths_, 'r_path_idx': r_path_idx_, 'r_paths_mask': r_paths_mask_}
+                    'r_paths': r_paths_, 'r_path_idx': r_path_idx_, 'r_paths_mask': r_paths_mask_,
+                    'target': cls_num}
         if self.args.pointer:
             data_dic['e_voc'] = e_voc
             data_dic['e_voc_'] = e_voc_
@@ -133,4 +136,5 @@ def collect_fn(batch):
         data['voc_len'] = torch.tensor(
             [max_voc_len for _ in batch])  # we set e voc len equal for all data in batch, for data parallel
         data['content_e'] = torch.stack([b['content_e'] for b in batch], dim=0)[:, :max_content_len]
+    data['target'] = torch.stack([b['target'] for b in batch], dim=0)
     return data

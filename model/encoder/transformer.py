@@ -38,7 +38,7 @@ class Encoder(nn.Module):
         self.args = args
         self.transformer_blocks = nn.ModuleList([TransformerBlock(args) for _ in range(args.layers)])
         self.max_code_length = args.max_code_length
-        self.relative_position = args.relative_position
+        # self.relative_position = args.relative_position
         self.h = args.attn_heads
         self.absolute_path = args.absolute_path
         self.relative_path = args.relation_path

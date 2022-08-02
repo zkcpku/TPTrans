@@ -22,7 +22,7 @@ def data_count(data, count_dic):
     count_dic['uni_paths'] += len(paths)
     count_dic['paths'] += (sum([len(val) for key, val in paths_map.items()]) / 2 * 2)
     count_dic['named'] += code_named.count(1)
-    count_dic['func'] += len(func_name)
+    count_dic['func'] += len(str(func_name))
     count_dic['nums'] += 1
     count_dic['uni_r_paths'] += (len(r_paths))
     count_dic['path_len'] += sum([len(i) for i in paths])

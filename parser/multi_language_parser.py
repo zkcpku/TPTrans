@@ -37,6 +37,12 @@ string_type = {
            'raw_string_literal', 'rune_literal']
 }
 
+default_string_type = [e for k in string_type for e in string_type[k]]
+default_identifier_type = [e for k in identifier_type for e in identifier_type[k]]
+string_type['java'] = default_string_type
+identifier_type['java'] = default_identifier_type
+string_type['cpp'] = default_string_type
+identifier_type['cpp'] = default_identifier_type
 
 @attr.s
 class MyNode:
@@ -52,7 +58,7 @@ def boolean_string(s):
     return s == 'True'
 
 
-def clean_convert_split(args, paths, code, f_name):
+def clean_convert_split(args, paths, code):
     data_lines = code.splitlines()
     temp_paths = []
     func_name = []
@@ -73,12 +79,8 @@ def clean_convert_split(args, paths, code, f_name):
             assert l_[0] == r_[0]  # assert at same line
             literal = data_lines[l_[0]][l_[1]: r_[1]]
             blocks = split_identifier_into_parts(literal)
-            if not get_func and judge_func(literal, f_name):  # this is func name
-                func_name = blocks
-                new_node = MyNode('<METHOD>', terminal.is_named, count, int(l_[0]))
-                count += 1
-                temp_paths.append(path + [new_node] if path[-1].type in identifier_type else path[:-1] + [new_node])
-                get_func = True
+            if False:  # this is func name
+                pass
             elif terminal.type in identifier_type[args.language]:
                 for block in blocks:
                     new_node = MyNode(block, terminal.is_named, count, int(l_[0]))
@@ -97,13 +99,14 @@ def clean_convert_split(args, paths, code, f_name):
                 new_node = MyNode(terminal.type, terminal.is_named, count, int(l_[0]))
                 count += 1
                 temp_paths.append(path[:-1] + [new_node])
-    if not get_func:
-        print(code)
-    return temp_paths[:args.max_code_length], func_name
+    # if not get_func:
+    #     print(code)
+    return temp_paths[:args.max_code_length]
 
 
 def language_parse(args, data, lang_parser):
-    code, f_name = data['code'], data['func_name']
+    code = data[1]
+    # code, f_name = data['code'], data['func_name']
     tree = lang_parser.parse(bytes(code, "utf-8"))
     stack, paths = [], []
     paths_map = dict()
@@ -123,7 +126,7 @@ def language_parse(args, data, lang_parser):
 
     cursor = tree.walk()
     dfs(cursor.node)
-    paths, func_name = clean_convert_split(args, paths, code, f_name)
+    paths = clean_convert_split(args, paths, code)
     r_path_idx = paths_to_idx(paths, root_path_pool)
     terminals = [path[-1] for path in paths]
     combinations = itertools.combinations(iterable=paths, r=2)
@@ -139,7 +142,7 @@ def language_parse(args, data, lang_parser):
             paths_map[path_idx].append(terminals.index(r_node))
         else:
             paths_map[path_idx] = [terminals.index(l_node), terminals.index(r_node)]
-    return path_pool, [node.type for node in terminals], [int(node.named) for node in terminals], func_name, \
+    return path_pool, [node.type for node in terminals], [int(node.named) for node in terminals], \
            paths_map, [int(node.row) + 1 for node in terminals], r_path_idx, root_path_pool
 
 
@@ -148,13 +151,11 @@ def sub_process(args, idx, all_data, lang_parser):
     source_dic, target_dic = dict(), dict()
     with open(save_path, 'w') as f:
         for data in tqdm(all_data):
-            f_name = data['func_name']
-            if len(f_name) == 0:  # javascript anonymous function should been removed, following code transformer
-                continue
-            paths, code_tokens, code_named, func_name, paths_map, row, r_path_idx, r_paths = \
+            cls_idx = data[0]
+            paths, code_tokens, code_named, paths_map, row, r_path_idx, r_paths = \
                 language_parse(args, data, lang_parser)
-            token_statistic(source_dic, target_dic, code_tokens, func_name)
-            data = {'target': func_name,
+            token_statistic(source_dic, target_dic, code_tokens, str(cls_idx))
+            data = {'target': str(cls_idx),
                     'content': code_tokens, 'named': code_named,
                     'paths': paths, 'paths_map': paths_map, 'row': row, 'r_path_idx': r_path_idx, 'r_paths': r_paths
                     }
@@ -185,7 +186,11 @@ def process(args):
     source_dic, target_dic = dict(), dict()
     node_dic = node_dict_init(args.language)
     count_dic = count_dict_init()
-    all_data = read_files(args.language, args.type)
+    # all_data = read_files(args.language, args.type)
+    # all_data = read_files(args.file_path)
+    with open(args.file_path, 'r') as f:
+        all_data = json.load(f)
+    
     if args.shuffle: random.shuffle(all_data)
     if args.nums > 0: all_data = all_data[:args.nums]
     if args.process_num > 1:
@@ -256,14 +261,15 @@ def process(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--language', choices=['python', 'javascript', 'ruby', 'go'], type=str, default='javascript')
+    parser.add_argument('--language', choices=['python', 'javascript', 'java','cpp','ruby', 'go'], type=str, default='python')
+    parser.add_argument('--file_path', type=str, default="/home/zhangkechi/workspace/data/codenet/processed_seq/python/devset.json")
     parser.add_argument('--type', choices=['train', 'valid', 'test', 'temp'], type=str, default='test')
     parser.add_argument('--max_path_length', type=int, default=32)
     parser.add_argument('--max_code_length', type=int, default=512)
     parser.add_argument('--nums', type=int, default=-1)
     parser.add_argument('--punctuation', type=boolean_string, default=False)
-    parser.add_argument('--process_num', type=int, default=32)
-    parser.add_argument('--save_vocab', type=boolean_string, default=False)
+    parser.add_argument('--process_num', type=int, default=8)
+    parser.add_argument('--save_vocab', type=boolean_string, default=True)
     parser.add_argument('--shuffle', type=boolean_string, default=False)
     args = parser.parse_args()
     print(args)
